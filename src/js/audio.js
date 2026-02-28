@@ -12,9 +12,20 @@ window.LyricSync.Audio = (() => {
   let animFrameId = null;
   let loadToken = 0;
 
+  function logEvent(level, message, meta = null) {
+    if (!window.api?.appendLog) return;
+    window.api.appendLog({ level, message, meta }).catch(() => {});
+  }
 
   function init() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  function base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
   }
 
   async function loadFile(fileData) {
@@ -37,26 +48,49 @@ window.LyricSync.Audio = (() => {
 
     // Build a file:// URL (webSecurity: false lets this work)
     const fileUrl = 'file:///' + fileData.path.replace(/\\/g, '/');
-    logEvent('INFO', 'audio.loadFile start', { name: fileData.name, path: fileData.path, size: fileData.size });
+    logEvent('INFO', 'audio.loadFile start', { name: fileData.name, path: fileData.path, size: fileData.size, token });
 
-    audioElement = new Audio();
-    audioElement.src = fileUrl;
-    audioElement.preload = 'auto';
+    const nextElement = new Audio();
+    nextElement.src = fileUrl;
+    nextElement.preload = 'auto';
 
-    // Wait for metadata
+    // Wait for metadata using this specific element to avoid cross-load races.
     await new Promise((resolve, reject) => {
-      const onMeta = () => { cleanup(); resolve(); };
-      const onErr = (e) => { cleanup(); reject(e); };
-      const cleanup = () => {
-        audioElement.removeEventListener('loadedmetadata', onMeta);
-        audioElement.removeEventListener('error', onErr);
+      let settled = false;
+      const onMeta = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
       };
-      audioElement.addEventListener('loadedmetadata', onMeta);
-      audioElement.addEventListener('error', onErr);
-      // Safety timeout
-      setTimeout(() => { cleanup(); resolve(); }, 5000);
+      const onErr = (e) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(e);
+      };
+      const cleanup = () => {
+        nextElement.removeEventListener('loadedmetadata', onMeta);
+        nextElement.removeEventListener('error', onErr);
+        clearTimeout(timeoutId);
+      };
+      nextElement.addEventListener('loadedmetadata', onMeta);
+      nextElement.addEventListener('error', onErr);
+      const timeoutId = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        logEvent('WARN', 'audio metadata timeout', { token, path: fileData.path });
+        resolve();
+      }, 5000);
     });
 
+    if (token !== loadToken) {
+      nextElement.pause();
+      return { fileInfo, audioBuffer };
+    }
+
+    audioElement = nextElement;
     fileInfo.duration = audioElement.duration || 0;
     logEvent('INFO', 'audio metadata ready', { duration: fileInfo.duration, token });
 
@@ -68,13 +102,37 @@ window.LyricSync.Audio = (() => {
     // Decode waveform in background so the UI can continue immediately.
     (async () => {
       try {
+        let buffer = null;
 
-        if (token !== loadToken) returun;
+        // Prefer file:// fetch because it avoids a huge base64 IPC payload.
+        try {
+          const response = await fetch(fileUrl);
+          buffer = await response.arrayBuffer();
+          logEvent('INFO', 'waveform source fetch(file://) succeeded', { token, bytes: buffer.byteLength });
+        } catch (fetchErr) {
+          logEvent('WARN', 'waveform fetch(file://) failed, falling back to IPC base64', { token, error: String(fetchErr) });
+        }
+
+        if (!buffer) {
+          const base64 = await window.api.readAudioBase64(fileData.path);
+          if (base64) {
+            buffer = base64ToArrayBuffer(base64);
+            logEvent('INFO', 'waveform source IPC base64 succeeded', { token, bytes: buffer.byteLength });
+          }
+        }
+
+        if (!buffer || token !== loadToken) return;
+
+        const decoded = await audioContext.decodeAudioData(buffer);
+        if (token !== loadToken) return;
 
         audioBuffer = decoded;
         fileInfo.sampleRate = audioBuffer.sampleRate;
         fileInfo.channels = audioBuffer.numberOfChannels;
-
+        logEvent('INFO', 'waveform decode ready', { token, sampleRate: fileInfo.sampleRate, channels: fileInfo.channels });
+        if (onWaveformReady) onWaveformReady();
+      } catch (e) {
+        logEvent('ERROR', 'waveform decode failed', { token, error: String(e) });
         console.warn('Waveform decode failed (playback still works):', e);
       }
     })();
