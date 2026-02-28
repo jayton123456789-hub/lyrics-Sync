@@ -154,14 +154,18 @@ const App = (() => {
     }
   }
 
+  async function loadAndDisplayAudio(fileData, source) {
+    logEvent('INFO', `${source} selected`, { name: fileData.name, size: fileData.size, path: fileData.path });
+    await Audio.loadFile(fileData);
+    showFileLoaded();
+    logEvent('INFO', `${source} loaded`, { name: fileData.name, duration: Audio.getDuration() });
+  }
+
   async function handleFileOpen() {
     try {
       const fileData = await window.api.openAudioFile();
       if (!fileData) return;
-      logEvent('INFO', 'handleFileOpen selected', { name: fileData.name, size: fileData.size, path: fileData.path });
-      await Audio.loadFile(fileData);
-      showFileLoaded();
-      logEvent('INFO', 'handleFileOpen loaded', { name: fileData.name, duration: Audio.getDuration() });
+      await loadAndDisplayAudio(fileData, 'handleFileOpen');
     } catch (e) {
       logEvent('ERROR', 'handleFileOpen failed', { error: String(e) });
       console.error('Audio load failed:', e);
@@ -177,10 +181,7 @@ const App = (() => {
       size: file.size,
     };
     try {
-      logEvent('INFO', 'handleDroppedFile selected', { name: fileData.name, size: fileData.size, path: fileData.path });
-      await Audio.loadFile(fileData);
-      showFileLoaded();
-      logEvent('INFO', 'handleDroppedFile loaded', { name: fileData.name, duration: Audio.getDuration() });
+      await loadAndDisplayAudio(fileData, 'handleDroppedFile');
     } catch (e) {
       logEvent('ERROR', 'handleDroppedFile failed', { error: String(e), name: fileData.name });
       console.error('Drop load failed:', e);

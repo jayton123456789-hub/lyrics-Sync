@@ -21,6 +21,13 @@ window.LyricSync.Audio = (() => {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
 
+  function base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
   async function loadFile(fileData) {
     if (!audioContext) init();
     const token = ++loadToken;
@@ -109,11 +116,8 @@ window.LyricSync.Audio = (() => {
         if (!buffer) {
           const base64 = await window.api.readAudioBase64(fileData.path);
           if (base64) {
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            buffer = bytes.buffer;
-            logEvent('INFO', 'waveform source IPC base64 succeeded', { token, bytes: bytes.byteLength });
+            buffer = base64ToArrayBuffer(base64);
+            logEvent('INFO', 'waveform source IPC base64 succeeded', { token, bytes: buffer.byteLength });
           }
         }
 
