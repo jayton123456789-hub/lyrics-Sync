@@ -12,6 +12,7 @@ window.LyricSync.Audio = (() => {
   let animFrameId = null;
   let loadToken = 0;
 
+
   function init() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
@@ -36,6 +37,7 @@ window.LyricSync.Audio = (() => {
 
     // Build a file:// URL (webSecurity: false lets this work)
     const fileUrl = 'file:///' + fileData.path.replace(/\\/g, '/');
+    logEvent('INFO', 'audio.loadFile start', { name: fileData.name, path: fileData.path, size: fileData.size });
 
     audioElement = new Audio();
     audioElement.src = fileUrl;
@@ -56,6 +58,7 @@ window.LyricSync.Audio = (() => {
     });
 
     fileInfo.duration = audioElement.duration || 0;
+    logEvent('INFO', 'audio metadata ready', { duration: fileInfo.duration, token });
 
     audioElement.addEventListener('ended', () => {
       cancelAnimationFrame(animFrameId);
@@ -65,20 +68,13 @@ window.LyricSync.Audio = (() => {
     // Decode waveform in background so the UI can continue immediately.
     (async () => {
       try {
-        const base64 = await window.api.readAudioBase64(fileData.path);
-        if (!base64 || token !== loadToken) return;
 
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const decoded = await audioContext.decodeAudioData(bytes.buffer);
-        if (token !== loadToken) return;
+        if (token !== loadToken) returun;
 
         audioBuffer = decoded;
         fileInfo.sampleRate = audioBuffer.sampleRate;
         fileInfo.channels = audioBuffer.numberOfChannels;
-        if (onWaveformReady) onWaveformReady();
-      } catch (e) {
+
         console.warn('Waveform decode failed (playback still works):', e);
       }
     })();

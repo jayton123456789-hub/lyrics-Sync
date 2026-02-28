@@ -13,8 +13,25 @@ const App = (() => {
   const screens = ['Import', 'Lyrics', 'Timing', 'Preview', 'Export'];
   const completedScreens = new Set();
 
+  function logEvent(level, message, meta = null) {
+    if (!window.api?.appendLog) return;
+    window.api.appendLog({ level, message, meta }).catch(() => {});
+  }
+
   // ===== INIT =====
   function init() {
+    if (window.api?.getLogPath) {
+      window.api.getLogPath().then((logPath) => {
+        logEvent('INFO', 'renderer init', { logPath });
+      }).catch(() => {});
+    }
+    window.addEventListener('error', (ev) => {
+      logEvent('ERROR', 'renderer window error', { message: ev.message, filename: ev.filename, lineno: ev.lineno });
+    });
+    window.addEventListener('unhandledrejection', (ev) => {
+      logEvent('ERROR', 'renderer unhandled rejection', { reason: String(ev.reason) });
+    });
+
     renderTitlebar();
     renderHeader();
     renderContent();
@@ -141,9 +158,7 @@ const App = (() => {
     try {
       const fileData = await window.api.openAudioFile();
       if (!fileData) return;
-      await Audio.loadFile(fileData);
-      showFileLoaded();
-    } catch (e) {
+
       console.error('Audio load failed:', e);
       alert('Could not load that audio file. Please try another format or file.');
     }
@@ -157,9 +172,12 @@ const App = (() => {
       size: file.size,
     };
     try {
+      logEvent('INFO', 'handleDroppedFile selected', { name: fileData.name, size: fileData.size, path: fileData.path });
       await Audio.loadFile(fileData);
       showFileLoaded();
+      logEvent('INFO', 'handleDroppedFile loaded', { name: fileData.name });
     } catch (e) {
+      logEvent('ERROR', 'handleDroppedFile failed', { error: String(e), name: fileData.name });
       console.error('Drop load failed:', e);
     }
   }
