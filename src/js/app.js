@@ -138,10 +138,15 @@ const App = (() => {
   }
 
   async function handleFileOpen() {
-    const fileData = await window.api.openAudioFile();
-    if (!fileData) return;
-    await Audio.loadFile(fileData);
-    showFileLoaded();
+    try {
+      const fileData = await window.api.openAudioFile();
+      if (!fileData) return;
+      await Audio.loadFile(fileData);
+      showFileLoaded();
+    } catch (e) {
+      console.error('Audio load failed:', e);
+      alert('Could not load that audio file. Please try another format or file.');
+    }
   }
 
   async function handleDroppedFile(file) {
@@ -233,6 +238,9 @@ const App = (() => {
 
     // Draw waveform
     requestAnimationFrame(() => drawWaveform('waveform-canvas'));
+    Audio.setOnWaveformReady(() => {
+      requestAnimationFrame(() => drawWaveform('waveform-canvas'));
+    });
 
     // Time update handler for import screen
     Audio.setOnTimeUpdate((time) => {

@@ -8,7 +8,9 @@ window.LyricSync.Audio = (() => {
   let fileInfo = null;
   let onTimeUpdate = null;
   let onEnded = null;
+  let onWaveformReady = null;
   let animFrameId = null;
+  let loadToken = 0;
 
   function init() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -16,12 +18,14 @@ window.LyricSync.Audio = (() => {
 
   async function loadFile(fileData) {
     if (!audioContext) init();
+    const token = ++loadToken;
 
     fileInfo = {
       name: fileData.name,
       path: fileData.path,
       size: fileData.size,
     };
+    audioBuffer = null;
 
     // Kill old element
     if (audioElement) {
@@ -58,20 +62,26 @@ window.LyricSync.Audio = (() => {
       if (onEnded) onEnded();
     });
 
-    // Decode for waveform (async, non-blocking)
-    try {
-      const base64 = await window.api.readAudioBase64(fileData.path);
-      if (base64) {
+    // Decode waveform in background so the UI can continue immediately.
+    (async () => {
+      try {
+        const base64 = await window.api.readAudioBase64(fileData.path);
+        if (!base64 || token !== loadToken) return;
+
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+        const decoded = await audioContext.decodeAudioData(bytes.buffer);
+        if (token !== loadToken) return;
+
+        audioBuffer = decoded;
         fileInfo.sampleRate = audioBuffer.sampleRate;
         fileInfo.channels = audioBuffer.numberOfChannels;
+        if (onWaveformReady) onWaveformReady();
+      } catch (e) {
+        console.warn('Waveform decode failed (playback still works):', e);
       }
-    } catch (e) {
-      console.warn('Waveform decode failed (playback still works):', e);
-    }
+    })();
 
     return { fileInfo, audioBuffer };
   }
@@ -111,6 +121,7 @@ window.LyricSync.Audio = (() => {
   function getAudioBuffer() { return audioBuffer; }
   function setOnTimeUpdate(fn) { onTimeUpdate = fn; }
   function setOnEnded(fn) { onEnded = fn; }
+  function setOnWaveformReady(fn) { onWaveformReady = fn; }
 
   function _startTimeLoop() {
     cancelAnimationFrame(animFrameId);
@@ -149,6 +160,6 @@ window.LyricSync.Audio = (() => {
     init, loadFile, play, pause, stop, seek,
     setRate, getRate, getCurrentTime, getDuration,
     isPlaying, getFileInfo, getAudioBuffer, getWaveformPeaks,
-    setOnTimeUpdate, setOnEnded,
+    setOnTimeUpdate, setOnEnded, setOnWaveformReady,
   };
 })();
