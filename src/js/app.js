@@ -161,7 +161,7 @@ const App = (() => {
       logEvent('INFO', 'handleFileOpen selected', { name: fileData.name, size: fileData.size, path: fileData.path });
       await Audio.loadFile(fileData);
       showFileLoaded();
-      logEvent('INFO', 'handleDroppedFile loaded', { name: fileData.name });
+      logEvent('INFO', 'handleFileOpen loaded', { name: fileData.name });
     } catch (e) {
       logEvent('ERROR', 'handleFileOpen failed', { error: String(e) });
       console.error('Audio load failed:', e);
@@ -180,7 +180,7 @@ const App = (() => {
       logEvent('INFO', 'handleDroppedFile selected', { name: fileData.name, size: fileData.size, path: fileData.path });
       await Audio.loadFile(fileData);
       showFileLoaded();
-      logEvent('INFO', 'handleFileOpen loaded', { name: fileData.name });
+      logEvent('INFO', 'handleDroppedFile loaded', { name: fileData.name });
     } catch (e) {
       logEvent('ERROR', 'handleDroppedFile failed', { error: String(e), name: fileData.name });
       console.error('Drop load failed:', e);
