@@ -1,0 +1,23 @@
+{
+  "name": "lyric-sync",
+  "version": "1.0.0",
+  "description": "Per-word SRT generator - tap along to time lyrics",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "dependencies": {
+    "electron": "^28.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.lyricsync.app",
+    "productName": "LyricSync",
+    "win": {
+      "target": "portable"
+    }
+  }
+}

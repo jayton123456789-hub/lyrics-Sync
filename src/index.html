@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LyricSync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- ERROR OVERLAY — shows JS errors visually -->
+  <div id="error-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:99999; background:#1a0020; color:#ff5555; font-family:monospace; font-size:14px; padding:40px; overflow:auto; white-space:pre-wrap;">
+    <h1 style="color:#ff5555; font-size:24px; margin-bottom:20px;">⚠ JS ERROR</h1>
+    <div id="error-text"></div>
+  </div>
+
+  <script>
+    // Catch ALL errors and show them visually
+    window.onerror = function(msg, url, line, col, error) {
+      var overlay = document.getElementById('error-overlay');
+      var text = document.getElementById('error-text');
+      overlay.style.display = 'block';
+      text.textContent += 'ERROR: ' + msg + '\nFile: ' + url + '\nLine: ' + line + ':' + col + '\n';
+      if (error && error.stack) text.textContent += 'Stack: ' + error.stack + '\n\n';
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      var overlay = document.getElementById('error-overlay');
+      var text = document.getElementById('error-text');
+      overlay.style.display = 'block';
+      text.textContent += 'UNHANDLED PROMISE: ' + (e.reason ? (e.reason.stack || e.reason) : e) + '\n\n';
+    });
+  </script>
+
+  <!-- Titlebar -->
+  <div class="titlebar" id="titlebar"></div>
+  
+  <!-- Header with nav -->
+  <div class="header" id="header"></div>
+  
+  <!-- Main content area -->
+  <div class="content" id="content"></div>
+
+  <script>
+    document.addEventListener('dragover', function(e) { e.preventDefault(); });
+    document.addEventListener('drop', function(e) { e.preventDefault(); });
+  </script>
+
+  <script src="js/utils.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/lyrics-parser.js"></script>
+  <script src="js/timing-engine.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
