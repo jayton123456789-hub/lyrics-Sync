@@ -158,12 +158,7 @@ const App = (() => {
     try {
       const fileData = await window.api.openAudioFile();
       if (!fileData) return;
-      logEvent('INFO', 'handleFileOpen selected', { name: fileData.name, size: fileData.size, path: fileData.path });
-      await Audio.loadFile(fileData);
-      showFileLoaded();
-      logEvent('INFO', 'handleFileOpen loaded', { name: fileData.name });
-    } catch (e) {
-      logEvent('ERROR', 'handleFileOpen failed', { error: String(e) });
+
       console.error('Audio load failed:', e);
       alert('Could not load that audio file. Please try another format or file.');
     }

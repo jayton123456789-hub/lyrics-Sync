@@ -13,11 +13,6 @@ window.LyricSync.Audio = (() => {
   let loadToken = 0;
 
 
-  function logEvent(level, message, meta = null) {
-    if (!window.api?.appendLog) return;
-    window.api.appendLog({ level, message, meta }).catch(() => {});
-  }
-
   function init() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
@@ -73,40 +68,13 @@ window.LyricSync.Audio = (() => {
     // Decode waveform in background so the UI can continue immediately.
     (async () => {
       try {
-        let buffer = null;
 
-        // Prefer file:// fetch because it avoids a huge base64 IPC payload.
-        try {
-          const response = await fetch(fileUrl);
-          buffer = await response.arrayBuffer();
-          logEvent('INFO', 'waveform source fetch(file://) succeeded', { token, bytes: buffer.byteLength });
-        } catch (fetchErr) {
-          logEvent('WARN', 'waveform fetch(file://) failed, falling back to IPC base64', { token, error: String(fetchErr) });
-        }
-
-        if (!buffer) {
-          const base64 = await window.api.readAudioBase64(fileData.path);
-          if (base64) {
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            buffer = bytes.buffer;
-            logEvent('INFO', 'waveform source IPC base64 succeeded', { token, bytes: bytes.byteLength });
-          }
-        }
-
-        if (!buffer || token !== loadToken) return;
-
-        const decoded = await audioContext.decodeAudioData(buffer);
-        if (token !== loadToken) return;
+        if (token !== loadToken) returun;
 
         audioBuffer = decoded;
         fileInfo.sampleRate = audioBuffer.sampleRate;
         fileInfo.channels = audioBuffer.numberOfChannels;
-        logEvent('INFO', 'waveform decode ready', { token, sampleRate: fileInfo.sampleRate, channels: fileInfo.channels });
-        if (onWaveformReady) onWaveformReady();
-      } catch (e) {
-        logEvent('ERROR', 'waveform decode failed', { token, error: String(e) });
+
         console.warn('Waveform decode failed (playback still works):', e);
       }
     })();
