@@ -4,6 +4,26 @@ const fs = require('fs');
 
 let mainWindow;
 
+let logFilePath = null;
+
+function initLogFile() {
+  if (logFilePath) return logFilePath;
+  logFilePath = path.join(app.getPath('documents'), 'lyrics-sync-debug.log');
+  return logFilePath;
+}
+
+function writeLog(level, message, meta = null) {
+  try {
+    const target = initLogFile();
+    const timestamp = new Date().toISOString();
+    const payload = meta ? ` ${JSON.stringify(meta)}` : '';
+    fs.appendFileSync(target, `[${timestamp}] [${level}] ${message}${payload}\n`, 'utf8');
+  } catch (e) {
+    console.error('log write failed:', e);
+  }
+}
+
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -28,8 +48,15 @@ function createWindow() {
   mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(createWindow);
-app.on('window-all-closed', () => app.quit());
+app.whenReady().then(() => {
+  initLogFile();
+  writeLog('INFO', 'app ready');
+  createWindow();
+});
+app.on('window-all-closed', () => {
+  writeLog('INFO', 'window-all-closed, quitting');
+  app.quit();
+});
 
 // ── Window controls ──
 ipcMain.on('window-minimize', () => mainWindow?.minimize());
@@ -49,10 +76,14 @@ ipcMain.handle('open-audio-file', async () => {
     ],
     properties: ['openFile'],
   });
-  if (result.canceled || !result.filePaths.length) return null;
+  if (result.canceled || !result.filePaths.length) {
+    writeLog('INFO', 'open-audio-file canceled');
+    return null;
+  }
 
   const filePath = result.filePaths[0];
   const stats = fs.statSync(filePath);
+  writeLog('INFO', 'open-audio-file selected', { filePath, size: stats.size });
   return {
     path: filePath,
     name: path.basename(filePath),
@@ -63,8 +94,10 @@ ipcMain.handle('open-audio-file', async () => {
 // ── Read audio as base64 (for waveform decoding) ──
 ipcMain.handle('read-audio-base64', async (_e, filePath) => {
   try {
+    writeLog('INFO', 'read-audio-base64', { filePath });
     return fs.readFileSync(filePath).toString('base64');
   } catch (e) {
+    writeLog('ERROR', 'read-audio-base64 failed', { filePath, error: String(e) });
     console.error('read-audio-base64 failed:', e);
     return null;
   }
@@ -84,5 +117,24 @@ ipcMain.handle('save-file', async (_e, { content, defaultName, filters }) => {
   });
   if (result.canceled) return false;
   fs.writeFileSync(result.filePath, content, 'utf-8');
+  writeLog('INFO', 'save-file success', { filePath: result.filePath });
   return result.filePath;
+});
+
+
+ipcMain.handle('append-log', async (_e, entry) => {
+  const level = entry?.level || 'INFO';
+  const message = entry?.message || 'no-message';
+  writeLog(level, message, entry?.meta || null);
+  return true;
+});
+
+ipcMain.handle('get-log-path', async () => initLogFile());
+
+process.on('uncaughtException', (err) => {
+  writeLog('FATAL', 'uncaughtException', { error: err?.stack || String(err) });
+});
+
+process.on('unhandledRejection', (reason) => {
+  writeLog('FATAL', 'unhandledRejection', { reason: String(reason) });
 });
